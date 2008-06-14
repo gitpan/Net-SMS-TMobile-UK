@@ -1,6 +1,6 @@
 ---
 name: Net-SMS-TMobile-UK
-version: 0.01
+version: 0.02
 author:
   - 'Ben Charlton <benc@cpan.org>'
 abstract: Send SMS Messages via the T-Mobile UK Website.
@@ -15,8 +15,8 @@ build_requires:
 provides:
   Net::SMS::TMobile::UK:
     file: lib/Net/SMS/TMobile/UK.pm
-    version: 0.01
-generated_by: Module::Build version 0.2808
+    version: 0.02
+generated_by: Module::Build version 0.280801
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.2.html
   version: 1.2

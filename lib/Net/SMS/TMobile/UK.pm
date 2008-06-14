@@ -4,7 +4,7 @@
 #
 # Author: Ben Charlton <ben@spod.cx>
 #
-# Copyright (c) 2007 Ben Charlton. All Rights Reserved. 
+# Copyright (c) 2007,2008 Ben Charlton. All Rights Reserved. 
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl itself.
 #
@@ -12,11 +12,12 @@
 
 package Net::SMS::TMobile::UK;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use strict;
 use HTTP::Request::Common qw(POST GET);
 use LWP::UserAgent;
+my $debug = 0;
 
 =head1 NAME
 
@@ -54,6 +55,10 @@ The complete list of arguments is:
   username  : Your registered T-Mobile username.
   password  : Your registered T-Mobile password.
   useragent : Name of the user agent you want to display to T-Mobile.
+  debug     : 0 (default) or 1
+
+  Debug is optional and defaults to off, but can be set to 1 which prints
+  out the text of the http responses.
 
 =cut
 
@@ -72,6 +77,9 @@ sub new {
 	}
 	unless ($args{password}) {
 		return undef;
+	}
+	if ($args{debug} == 1) {
+		$debug = 1;
 	}
 
 	my $ua = LWP::UserAgent->new();
@@ -92,10 +100,11 @@ Sends a message through the T-Mobile website.
 
 Usage:
 
-  $sms->sendsms( to => $mobile_phone, message => $msg );
+  $sms->sendsms( to => $mobile_phone, message => $msg, report => 0 );
 
 where $mobile_phone is the mobile phone number that you're sending a 
-message to and $msg is the message text.
+message to and $msg is the message text. Setting report to 1 will enable
+delivery reports, but is otherwise optional.
 
 This method returns 1 if we successfully send the message and undef on failure.
 
@@ -110,6 +119,7 @@ sub sendsms () {
 
 	my $target=$args{to};
 	my $message=$args{message};
+	my $report='on' if $args{report};
 
 	## Check we have a target and message
 	unless ($target && $message) {
@@ -117,14 +127,22 @@ sub sendsms () {
 		return undef;
 	}
 
+	## Get initial session cookie. Sadly no longer optional :(
+	my $req = GET 'http://www.t-mobile.co.uk/';
+	my $res = $ua->request($req);
 
 	## Log in and get a session cookie
-	my $req = POST 'https://www.t-mobile.co.uk:443/eservice/mtmUserLoginDispatch.do',
+	$req = POST 'https://www.t-mobile.co.uk/service/your-account/login/',
 	   [ username=>$self->{USERNAME},
 	   password=>$self->{PASSWORD},
-	   submit=>"Login"];
+	   submit=>"Log in"];
 
-	my $res = $ua->request($req);
+	$res = $ua->request($req);
+
+	if ($debug) {
+		print "Login request:\n==================\n"; 
+		print $res->as_string;
+	}
 
 	## Check for successful request
 	unless ($res->is_redirect) {
@@ -132,20 +150,22 @@ sub sendsms () {
 		return undef;
 	}
 
-
 	my $content = $res->as_string;
 
-	## should return a redirect to  https://www.t-mobile.co.uk/eservice/private/landing.do
-	## If not, assume invalid credentials. 
-	unless ($content =~ m/private\/landing\.do/) {
+	## check for valid credentials
+	if ($content =~ m/Please enter a valid username and password/) {
 		$self->error(2);
 		return undef;
 	}
 
 
 	## Collect struts token for SMS form submission:
-	$req = GET 'https://www.t-mobile.co.uk:443/eservice/private/sendTextPreparing.do';
+	$req = GET 'https://www.t-mobile.co.uk/service/your-account/private/wgt/send-text-preparing/';
 	$res = $ua->request($req);
+	if ($debug) {
+		print "Token request:\n==================\n"; 
+		print $res->as_string;
+	}
 	unless ($res->is_success) {
 		$self->error(3);
 		return undef;
@@ -159,13 +179,19 @@ sub sendsms () {
 	}
 
 	## Post to SMS sending form with message details and struts token.
-	$req = POST 'https://www.t-mobile.co.uk:443/eservice/private/sendTextProcessing.do',
+	$req = POST 'https://www.t-mobile.co.uk/service/your-account/private/wgt/send-text-processing/',
 		[ 'org.apache.struts.taglib.html.TOKEN'=>$token,
 		'recipients'=>$target,
 		'message'=>$message,
+		'sendDeliveryReport'=>$report,
 		'submit'=>'Send' ];
 
 	$res = $ua->request($req);
+
+	if ($debug) {
+		print "SMS POST:\n==================\n"; 
+		print $res->as_string;
+	}
 	unless ($res->is_success) {
 		$self->error(3);
 		return undef;
@@ -190,7 +216,7 @@ Example:
   if(my $error = $sms->error) {
     if($error == 5) {
       die("Message or Destination missing\n");
-    } elseif ($error == 2) {
+    } elsif ($error == 2) {
       die("Username or password invalid\n");
     } else {
       die("Unexpected fault\n");
@@ -269,7 +295,7 @@ Net:SMS::Clickatell by Roberto Alamos Moreno for inspiration.
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright (c) 2007 Ben Charlton. All Rights Reserved.
+Copyright (c) 2007,2008 Ben Charlton. All Rights Reserved.
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 
