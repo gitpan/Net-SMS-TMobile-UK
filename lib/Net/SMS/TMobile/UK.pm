@@ -4,7 +4,7 @@
 #
 # Author: Ben Charlton <ben@spod.cx>
 #
-# Copyright (c) 2007,2008 Ben Charlton. All Rights Reserved. 
+# Copyright (c) 2007-2009 Ben Charlton. All Rights Reserved. 
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl itself.
 #
@@ -12,7 +12,7 @@
 
 package Net::SMS::TMobile::UK;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use strict;
 use HTTP::Request::Common qw(POST GET);
@@ -181,7 +181,7 @@ sub sendsms () {
 	## Post to SMS sending form with message details and struts token.
 	$req = POST 'https://www.t-mobile.co.uk/service/your-account/private/wgt/send-text-processing/',
 		[ 'org.apache.struts.taglib.html.TOKEN'=>$token,
-		'recipients'=>$target,
+		'selectedRecipients'=>$target,
 		'message'=>$message,
 		'sendDeliveryReport'=>$report,
 		'submit'=>'Send' ];
@@ -192,14 +192,14 @@ sub sendsms () {
 		print "SMS POST:\n==================\n"; 
 		print $res->as_string;
 	}
-	unless ($res->is_success) {
+	unless (($res->is_success) or ($res->is_redirect)) {
 		$self->error(3);
 		return undef;
 	}
 	$content = $res->as_string;
 
 	## Check for success
-	if ($content =~ m/Success/is) {
+	if ($content =~ m/(Success|sent-confirmation)/is) {
 		return 1;
 	} else {
 		$self->error(4);

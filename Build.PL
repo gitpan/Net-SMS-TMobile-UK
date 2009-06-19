@@ -10,6 +10,7 @@ my $builder = Module::Build->new(
     requires 	=> {
 	'LWP::UserAgent' => 0,
 	'HTTP::Request::Common' => 0,
+	'Crypt::SSLeay' => 0,
 
     },
     build_requires => {
